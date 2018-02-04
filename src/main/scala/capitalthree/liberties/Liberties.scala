@@ -30,10 +30,8 @@ object Liberties {
           val blockPlaced = event.getPlacedBlock.getBlock
           if (goStones.contains(blockPlaced)) {
             neighbors(event.getPos).foreach(pos =>
-              computeDanger(world, blockPlaced, pos) match {
-                case 2 =>
-                  surroundedGroup(world, pos).foreach { dead => InvisibleDiamondPickaxeMan.destroy(world, dead) }
-              }
+              if (computeDanger(world, blockPlaced, pos) == 2)
+                surroundedGroup(world, pos).foreach { dead => InvisibleDiamondPickaxeMan.destroy(world, dead) }
             )
             if (surroundedGroup(world, event.getPos).isDefined)
               event.setCanceled(true)

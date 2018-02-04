@@ -5,6 +5,7 @@ import java.util.UUID
 import com.mojang.authlib.GameProfile
 import net.minecraft.init.Items
 import net.minecraft.item.ItemStack
+import net.minecraft.network._
 import net.minecraft.util.EnumHand
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.WorldServer
@@ -13,6 +14,7 @@ import net.minecraftforge.common.util.FakePlayer
 class InvisibleDiamondPickaxeMan(world: WorldServer)
     extends FakePlayer(world, InvisibleDiamondPickaxeMan.PROFILE)
 {
+  {new NetHandlerPlayServer(null, FakeNetworkManager, this)}
   val notTheHammer = new ItemStack(Items.DIAMOND_PICKAXE)
 
   override def getHeldItem(hand: EnumHand): ItemStack = hand match {
@@ -33,4 +35,9 @@ object InvisibleDiamondPickaxeMan {
     val man = new InvisibleDiamondPickaxeMan(world)
     blocks.foreach(man.interactionManager.tryHarvestBlock)
   }
+}
+
+object FakeNetworkManager extends NetworkManager(EnumPacketDirection.CLIENTBOUND) {
+  override def isChannelOpen(): Boolean = true
+  override def sendPacket(packetIn: Packet[_]): Unit = {}
 }
