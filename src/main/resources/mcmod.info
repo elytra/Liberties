@@ -1,0 +1,16 @@
+[
+{
+  "modid": "nukeoption",
+  "name": "NuclearOption",
+  "description": "Simple vote-for-server-restart mod",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["capitalthree"],
+  "credits": "I love you all",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
