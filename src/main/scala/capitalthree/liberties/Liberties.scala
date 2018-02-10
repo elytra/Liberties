@@ -1,6 +1,7 @@
 package capitalthree.liberties
 
-import net.minecraft.block.Block
+import net.minecraft.block.state.IBlockState
+import net.minecraft.block.BlockSlab
 import net.minecraft.init.Blocks
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.{World, WorldServer}
@@ -8,7 +9,7 @@ import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.event.world.BlockEvent.PlaceEvent
 import net.minecraftforge.fml.common.Mod.EventHandler
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+import net.minecraftforge.fml.common.eventhandler.{EventPriority, SubscribeEvent}
 import net.minecraftforge.fml.common.Mod
 import org.apache.logging.log4j.Logger
 
@@ -16,31 +17,45 @@ import scala.collection.mutable
 
 @Mod(modid = "liberties", version = "1", name = "Liberties", modLanguage = "scala", acceptableRemoteVersions="*")
 object Liberties {
-  var logger:Logger = null
-  val goStones: Set[Block] = Set(Blocks.WOODEN_SLAB, Blocks.STONE_SLAB, Blocks.STONE_SLAB2, Blocks.PURPUR_SLAB)
+  var logger:Logger = _
 
   @EventHandler
   def init(e: FMLPreInitializationEvent): Unit = {
     logger = e.getModLog
 
     val handler = new Object {
-      @SubscribeEvent
-      def onPlace(event: PlaceEvent): Unit = event.getWorld match {
-        case world: WorldServer =>
-          val blockPlaced = event.getPlacedBlock.getBlock
-          if (goStones.contains(blockPlaced)) {
-            neighbors(event.getPos).foreach(pos =>
-              if (computeDanger(world, blockPlaced, pos) == 2)
-                surroundedGroup(world, pos).foreach { dead => InvisibleDiamondPickaxeMan.destroy(world, dead) }
-            )
-            if (surroundedGroup(world, event.getPos).isDefined)
-              event.setCanceled(true)
+      @SubscribeEvent(priority = EventPriority.HIGHEST)
+      def onPlace(event: PlaceEvent): Unit =  {
+        val blockPlaced = event.getPlacedBlock
+        if (isGoStone(blockPlaced)) {
+          var captured = false
+
+          neighbors(event.getPos).foreach { pos =>
+            if (computeDanger(event.getWorld, blockPlaced, pos) == 1) {
+              surroundedGroup(event.getWorld, pos).foreach { dead =>
+                captured = true
+                event.getWorld match {
+                  case world: WorldServer => InvisiblePickaxeMan.destroy(world, event.getPlayer, dead)
+                  case _ =>
+                }
+              }
+            }
           }
-        case _ =>
+
+          if (!captured && surroundedGroup(event.getWorld, event.getPos).isDefined)
+            event.setCanceled(true)
+        }
       }
     }
 
     MinecraftForge.EVENT_BUS.register(handler)
+    MinecraftForge.EVENT_BUS.register(InvisiblePickaxeMan) // for capturing drops
+  }
+
+  def isGoStone(state: IBlockState): Boolean = state.getBlock match{
+      // only bottom single slabs are go stones
+    case slab: BlockSlab => !slab.isDouble && (state.getValue(BlockSlab.HALF) eq BlockSlab.EnumBlockHalf.BOTTOM)
+    case _ => false
   }
 
   private def neighbors(pos: BlockPos): Seq[BlockPos] = Seq(
@@ -49,23 +64,22 @@ object Liberties {
   )
 
   private def surroundedGroup(world: World, startPos: BlockPos): Option[List[BlockPos]] =
-    surroundedGroup(world, world.getBlockState(startPos).getBlock, startPos)
+    surroundedGroup(world, world.getBlockState(startPos), startPos)
 
-  private def surroundedGroup(world: World, startBlock: Block, startPos: BlockPos): Option[List[BlockPos]] = {
+  private def surroundedGroup(world: World, startBlock: IBlockState, startPos: BlockPos): Option[List[BlockPos]] = {
     val group = mutable.Set(startPos)
     val explore = mutable.Stack(startPos)
 
     while (explore.nonEmpty) {
-      neighbors(explore.pop()).filterNot(group)
-        .foreach{pos =>
-          computeDanger(world, startBlock, pos) match {
-            case -1 => return None
-            case 0 =>
-              group.add(pos)
-              explore.push(pos)
-            case _ =>
-          }
+      neighbors(explore.pop()).filterNot(group).foreach{pos =>
+        computeDanger(world, startBlock, pos) match {
+          case -1 => return None
+          case 0 =>
+            group.add(pos)
+            explore.push(pos)
+          case _ =>
         }
+      }
     }
 
     Some(group.toList)
@@ -77,13 +91,13 @@ object Liberties {
     * 1 = other stone
     * 2 = wall
     */
-  private def computeDanger(world: World, startBlock: Block, pos: BlockPos): Int = {
+  private def computeDanger(world: World, startBlock: IBlockState, pos: BlockPos): Int = {
     val state = world.getBlockState(pos)
     if (state.getBlockHardness(world, pos) == 0) return -1 // any insta-break block is counted as a liberty
-    state.getBlock match {
+    state match {
       case Blocks.AIR => -1
       case `startBlock` => 0
-      case block => if (goStones.contains(block)) 1 else 2
+      case block => if (isGoStone(block)) 1 else 2
     }
   }
 }
