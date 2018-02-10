@@ -22,7 +22,7 @@ class InvisiblePickaxeMan(world: WorldServer)
 
   {
     new NetHandlerPlayServer(null, FakeNetworkManager, this)
-    inventory.mainInventory(0) = notTheHammer
+    inventory.mainInventory.set(0, notTheHammer)
     setHeldItem(EnumHand.MAIN_HAND, notTheHammer)
   }
 }
